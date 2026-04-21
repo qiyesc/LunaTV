@@ -3,6 +3,8 @@
 import { Sparkles } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
+import { isAIRecommendFeatureDisabled } from '@/lib/ai-recommend.client';
+
 import AIRecommendModal from './AIRecommendModal';
 import { BackButton } from './BackButton';
 import MobileBottomNav from './MobileBottomNav';
@@ -32,30 +34,8 @@ const PageLayout = ({
 
   // 检查 AI 功能是否开启
   useEffect(() => {
-    let cancelled = false;
-
-    (async () => {
-      try {
-        const response = await fetch('/api/ai-recommend', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            messages: [{ role: 'user', content: 'ping' }],
-          }),
-        });
-        if (!cancelled) {
-          setAiEnabled(response.status !== 403);
-        }
-      } catch (error) {
-        if (!cancelled) {
-          setAiEnabled(true);
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
+    const disabled = isAIRecommendFeatureDisabled();
+    setAiEnabled(!disabled);
   }, []);
 
   if (useModernNav) {

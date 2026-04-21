@@ -12,7 +12,8 @@ import { DEFAULT_USER_AGENT } from './user-agent';
 // 注意：所有源地址都经过实际测试验证（2025-10-06）
 const DOMESTIC_CANDIDATES: string[] = [
   // 国内优先源（经过验证的真实可用源）
-  'https://hub.gitmirror.com/raw.githubusercontent.com/FongMi/CatVodSpider/main/jar/custom_spider.jar', // GitMirror CDN (有效JAR)
+  'https://ghproxy.vip/https://raw.githubusercontent.com/FongMi/CatVodSpider/main/jar/custom_spider.jar', // ghproxy.vip CDN (有效JAR, 312ms)
+  'https://gh-proxy.com/https://raw.githubusercontent.com/FongMi/CatVodSpider/main/jar/custom_spider.jar', // gh-proxy.com CDN (有效JAR)
 ];
 
 const INTERNATIONAL_CANDIDATES: string[] = [
@@ -24,7 +25,6 @@ const INTERNATIONAL_CANDIDATES: string[] = [
 
 const PROXY_CANDIDATES: string[] = [
   // 代理源（经过测试的可用代理）
-  'https://gh-proxy.com/https://raw.githubusercontent.com/FongMi/CatVodSpider/main/jar/custom_spider.jar', // gh-proxy.com (有效JAR)
   'https://cors.isteed.cc/github.com/FongMi/CatVodSpider/raw/main/jar/custom_spider.jar', // CORS 代理 (有效JAR)
 ];
 
@@ -179,9 +179,31 @@ function md5(buf: Buffer): string {
 }
 
 export async function getSpiderJar(
-  forceRefresh = false
+  forceRefresh = false,
+  customUrl?: string
 ): Promise<SpiderJarInfo> {
   const now = Date.now();
+
+  // 🔑 如果指定了自定义 URL，优先尝试获取
+  if (customUrl) {
+    console.log(`[SpiderJar] 尝试获取自定义 jar: ${customUrl}`);
+    const buf = await fetchRemote(customUrl);
+    if (buf) {
+      const info: SpiderJarInfo = {
+        buffer: buf,
+        md5: md5(buf),
+        source: customUrl,
+        success: true,
+        cached: false,
+        timestamp: now,
+        size: buf.length,
+        tried: 1,
+      };
+      cache = info;
+      return info;
+    }
+    console.warn(`[SpiderJar] 自定义 jar 获取失败，回退到默认源`);
+  }
 
   // 重置失败记录（定期清理）
   if (now - lastFailureReset > FAILURE_RESET_INTERVAL) {

@@ -401,6 +401,14 @@ export async function getVideoResolutionFromM3u8(m3u8Url: string): Promise<{
         }
       });
 
+      // 为分片请求添加时间戳参数破除浏览器缓存
+      hls.config.xhrSetup = function(xhr: XMLHttpRequest, url: string) {
+        const urlWithTimestamp = url.includes('?')
+          ? `${url}&_t=${Date.now()}`
+          : `${url}?_t=${Date.now()}`;
+        xhr.open('GET', urlWithTimestamp, true);
+      };
+
       // 加载m3u8
       try {
         hls.loadSource(m3u8Url);
@@ -443,3 +451,4 @@ export function isSeriesCompleted(remarks?: string): boolean {
   // - 单独的"完"（但不包括"完整"）
   return /完结|已完结|全\d+集|完(?!整)/.test(remarks);
 }
+

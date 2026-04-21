@@ -2,13 +2,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Users, UserPlus, List as ListIcon, Lock, RefreshCw, Video, LogOut, Play } from 'lucide-react';
+import { Users, UserPlus, List as ListIcon, Lock, RefreshCw, Video, LogOut, Play, Radio } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useWatchRoomContext } from '@/components/WatchRoomProvider';
 import PageLayout from '@/components/PageLayout';
 import { getAuthInfoFromBrowserCookie } from '@/lib/auth';
 import MiniVideoCard from '@/components/watch-room/MiniVideoCard';
-import type { Room, PlayState } from '@/types/watch-room.types';
+import type { Room, PlayState, LiveState } from '@/types/watch-room.types';
 
 type TabType = 'create' | 'join' | 'list';
 
@@ -65,8 +65,8 @@ export default function WatchRoomPage() {
   useEffect(() => {
     if (activeTab === 'list') {
       loadRooms();
-      // 每5秒刷新一次
-      const interval = setInterval(loadRooms, 5000);
+      // 每1小时刷新一次
+      const interval = setInterval(loadRooms, 60 * 60 * 1000);
       return () => clearInterval(interval);
     }
   }, [activeTab, isConnected]);
@@ -343,6 +343,37 @@ export default function WatchRoomPage() {
                       </div>
                     )}
 
+                    {/* 正在观看的直播 */}
+                    {currentRoom.currentState && currentRoom.currentState.type === 'live' && (
+                      <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Radio className="w-4 h-4 text-red-500" />
+                          <h4 className="font-semibold text-gray-900 dark:text-gray-100">正在观看直播</h4>
+                        </div>
+                        <div
+                          className="bg-white dark:bg-gray-800 rounded-lg p-4 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                          onClick={() => {
+                            const state = currentRoom.currentState as LiveState;
+                            router.push(`/live?id=${state.channelId}&source=${state.channelUrl}`);
+                          }}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-lg flex items-center justify-center">
+                              <Radio className="w-6 h-6 text-red-500" />
+                            </div>
+                            <div>
+                              <h5 className="font-medium text-gray-900 dark:text-gray-100">
+                                {(currentRoom.currentState as LiveState).channelName}
+                              </h5>
+                              <p className="text-sm text-gray-500 dark:text-gray-400">
+                                点击加入观看
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     {/* 成员列表 */}
                     <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4">
                       <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">房间成员</h4>
@@ -373,9 +404,9 @@ export default function WatchRoomPage() {
                     {/* 提示信息 */}
                     <div className="bg-indigo-50 dark:bg-indigo-900/20 rounded-lg p-4 border border-indigo-200 dark:border-indigo-800">
                       <p className="text-sm text-indigo-800 dark:text-indigo-200">
-                        💡 {currentRoom.currentState && currentRoom.currentState.type === 'play'
-                          ? '点击上方视频卡片可跳转到播放页面继续观看'
-                          : '前往播放页面开始观影，房间成员将自动同步您的操作'}
+                        💡 {currentRoom.currentState && (currentRoom.currentState.type === 'play' || currentRoom.currentState.type === 'live')
+                          ? '点击上方卡片可跳转到播放页面继续观看'
+                          : '前往播放页面或直播页面开始观影，房间成员将自动同步您的操作'}
                       </p>
                     </div>
 
@@ -546,6 +577,37 @@ export default function WatchRoomPage() {
                       </div>
                     )}
 
+                    {/* 正在观看的直播 */}
+                    {currentRoom.currentState && currentRoom.currentState.type === 'live' && (
+                      <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Radio className="w-4 h-4 text-red-500" />
+                          <h4 className="font-semibold text-gray-900 dark:text-gray-100">正在观看直播</h4>
+                        </div>
+                        <div
+                          className="bg-white dark:bg-gray-800 rounded-lg p-4 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                          onClick={() => {
+                            const state = currentRoom.currentState as LiveState;
+                            router.push(`/live?id=${state.channelId}&source=${state.channelUrl}`);
+                          }}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-lg flex items-center justify-center">
+                              <Radio className="w-6 h-6 text-red-500" />
+                            </div>
+                            <div>
+                              <h5 className="font-medium text-gray-900 dark:text-gray-100">
+                                {(currentRoom.currentState as LiveState).channelName}
+                              </h5>
+                              <p className="text-sm text-gray-500 dark:text-gray-400">
+                                点击加入观看
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     {/* 成员列表 */}
                     <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4">
                       <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">房间成员</h4>
@@ -576,10 +638,10 @@ export default function WatchRoomPage() {
                     {/* 提示信息 */}
                     <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 border border-green-200 dark:border-green-800">
                       <p className="text-sm text-green-800 dark:text-green-200">
-                        💡 {currentRoom.currentState && currentRoom.currentState.type === 'play'
-                          ? '点击上方视频卡片可跳转到播放页面继续观看'
+                        💡 {currentRoom.currentState && (currentRoom.currentState.type === 'play' || currentRoom.currentState.type === 'live')
+                          ? '点击上方卡片可跳转到播放页面继续观看'
                           : isOwner
-                            ? '前往播放页面开始观影，房间成员将自动同步您的操作'
+                            ? '前往播放页面或直播页面开始观影，房间成员将自动同步您的操作'
                             : '等待房主开始播放，您的播放进度将自动跟随房主'}
                       </p>
                     </div>
@@ -770,6 +832,32 @@ export default function WatchRoomPage() {
                                 router.push(`/play?${params.toString()}`);
                               }}
                             />
+                          </div>
+                        );
+                      })()}
+
+                      {/* 正在观看的直播 - 小型卡片 */}
+                      {room.currentState && room.currentState.type === 'live' && (() => {
+                        const liveState = room.currentState as LiveState;
+                        return (
+                          <div className="mb-3">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Radio className="w-4 h-4 text-red-500" />
+                              <span className="text-sm font-medium text-red-600 dark:text-red-400">正在观看直播</span>
+                            </div>
+                            <div
+                              className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+                              onClick={() => {
+                                router.push(`/live?id=${liveState.channelId}&source=${liveState.channelUrl}`);
+                              }}
+                            >
+                              <div className="flex items-center gap-2">
+                                <Radio className="w-5 h-5 text-red-500" />
+                                <span className="font-medium text-gray-900 dark:text-gray-100 text-sm">
+                                  {liveState.channelName}
+                                </span>
+                              </div>
+                            </div>
                           </div>
                         );
                       })()}
