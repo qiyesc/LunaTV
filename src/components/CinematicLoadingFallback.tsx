@@ -19,7 +19,7 @@ import { Film, Popcorn, Star, Sparkles } from 'lucide-react';
  */
 
 const loadingMessages = [
-  { icon: Film, text: '正在为您准备今晚的观影清单...', emoji: '🎬' },
+  { icon: Film, text: '正在为您准备观影清单...', emoji: '🎬' },
   { icon: Popcorn, text: '爆米花准备好了吗？', emoji: '🍿' },
   { icon: Star, text: '发现了数百部精彩影片...', emoji: '⭐' },
   { icon: Sparkles, text: '正在寻找最适合您的推荐...', emoji: '✨' },
@@ -32,31 +32,19 @@ export function CinematicLoadingFallback() {
 
   // Fetch Bing wallpaper
   useEffect(() => {
-    let isMounted = true;
-    const abortController = new AbortController();
-
     const fetchBingWallpaper = async () => {
       try {
-        const response = await fetch('/api/bing-wallpaper', {
-          signal: abortController.signal,
-        });
+        const response = await fetch('/api/bing-wallpaper');
         const data = await response.json();
-        if (data.url && isMounted) {
+        if (data.url) {
           setBingWallpaper(data.url);
         }
       } catch (error) {
-        if (isMounted && (error as Error).name !== 'AbortError') {
-          console.log('Failed to fetch Bing wallpaper:', error);
-        }
+        console.log('Failed to fetch Bing wallpaper:', error);
       }
     };
 
     fetchBingWallpaper();
-
-    return () => {
-      isMounted = false;
-      abortController.abort();
-    };
   }, []);
 
   // Fade in after mount
@@ -77,21 +65,16 @@ export function CinematicLoadingFallback() {
 
   return (
     <div
-      className={`min-h-screen flex items-center justify-center relative overflow-hidden transition-opacity duration-500 ${
+      className={`min-h-screen flex items-center justify-center relative overflow-hidden transition-opacity duration-500 bg-gradient-to-b from-gray-900 via-gray-800 to-black ${
         isVisible ? 'opacity-100' : 'opacity-0'
       }`}
     >
-      {/* Bing wallpaper background */}
+      {/* Bing wallpaper background - fades in when loaded */}
       {bingWallpaper && (
         <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-opacity duration-1000"
           style={{ backgroundImage: `url(${bingWallpaper})` }}
         />
-      )}
-
-      {/* Fallback gradient background */}
-      {!bingWallpaper && (
-        <div className="absolute inset-0 bg-gradient-to-b from-gray-900 via-gray-800 to-black" />
       )}
 
       {/* Gradient overlay layers (like login page) */}

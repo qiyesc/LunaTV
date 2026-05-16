@@ -47,10 +47,11 @@ import {
   X,
 } from 'lucide-react';
 import { GripVertical, KeyRound, MessageSquare } from 'lucide-react';
+import { pinyin } from 'pinyin-pro';
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 
-import { AdminConfig, AdminConfigResult } from '@/lib/admin.types';
+import { AdminConfig, AdminConfigResult, DEFAULT_CRON_CONFIG } from '@/lib/admin.types';
 import { getAuthInfoFromBrowserCookie } from '@/lib/auth';
 
 import AIRecommendConfig from '@/components/AIRecommendConfig';
@@ -116,6 +117,27 @@ const buttonStyles = {
   toggleThumbOff: 'translate-x-1',
   // 快速操作按钮样式
   quickAction: 'px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md transition-colors',
+};
+
+/**
+ * 根据名称自动生成 Key（中文转拼音首字母）
+ * @param name 源名称
+ * @returns 生成的 Key
+ */
+const generateKeyFromName = (name: string): string => {
+  if (!name) return '';
+
+  const initials = name
+    .split('')
+    .map((char) => {
+      if (/[a-zA-Z]/.test(char)) return char.toUpperCase();
+      if (/[0-9]/.test(char)) return char;
+      const result = pinyin(char, { pattern: 'first', toneType: 'none' });
+      return result || char;
+    })
+    .join('');
+
+  return initials || name.substring(0, 4).toUpperCase();
 };
 
 // 通用弹窗组件
@@ -451,6 +473,8 @@ const UserConfig = ({ config, role, refreshConfig }: UserConfigProps) => {
 
   // 用户组筛选状态
   const [filterUserGroup, setFilterUserGroup] = useState<string>('all');
+  // 用户名搜索状态
+  const [filterUsername, setFilterUsername] = useState<string>('');
 
   // 🔑 TVBox Token 管理状态
   const [showTVBoxTokenModal, setShowTVBoxTokenModal] = useState(false);
@@ -1359,6 +1383,15 @@ const UserConfig = ({ config, role, refreshConfig }: UserConfigProps) => {
                 </option>
               ))}
             </select>
+            {/* 用户名搜索框 */}
+            <input
+              type='search'
+              aria-label='搜索用户名'
+              value={filterUsername}
+              onChange={(e) => setFilterUsername(e.target.value)}
+              placeholder='搜索用户名...'
+              className='px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent w-44'
+            />
           </div>
           <div className='flex items-center space-x-2'>
             {/* 批量操作按钮 */}
@@ -1581,6 +1614,12 @@ const UserConfig = ({ config, role, refreshConfig }: UserConfigProps) => {
                   return priority(a) - priority(b);
                 })
                 .filter((user) => {
+                  // 用户名搜索过滤
+                  if (filterUsername.trim()) {
+                    if (!user.username.toLowerCase().includes(filterUsername.trim().toLowerCase())) {
+                      return false;
+                    }
+                  }
                   // 根据选择的用户组筛选用户
                   if (filterUserGroup === 'all') {
                     return true; // 显示所有用户
@@ -3635,7 +3674,7 @@ const VideoSourceConfig = ({
       const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, 19);
 
       if (exportFormat === 'array') {
-        // 数组格式：[{name, key, api, detail, disabled, is_adult}]
+        // 数组格式：[{name, key, api, detail, disabled, is_adult, type, weight}]
         exportData = sourcesToExport.map((source) => ({
           name: source.name,
           key: source.key,
@@ -3643,10 +3682,12 @@ const VideoSourceConfig = ({
           detail: source.detail || '',
           disabled: source.disabled || false,
           is_adult: source.is_adult || false,
+          type: source.type || 'vod',
+          weight: source.weight ?? 50,
         }));
         filename = `video_sources_${timestamp}.json`;
       } else {
-        // 配置文件格式：{"api_site": {"key": {name, api, detail?, is_adult?}}}
+        // 配置文件格式：{"api_site": {"key": {name, api, detail?, is_adult?, type?, weight?}}}
         exportData = { api_site: {} };
         sourcesToExport.forEach((source) => {
           const sourceData: any = {
@@ -3659,6 +3700,12 @@ const VideoSourceConfig = ({
           }
           if (source.is_adult) {
             sourceData.is_adult = source.is_adult;
+          }
+          if (source.type && source.type !== 'vod') {
+            sourceData.type = source.type;
+          }
+          if (source.weight !== undefined && source.weight !== 50) {
+            sourceData.weight = source.weight;
           }
           exportData.api_site[source.key] = sourceData;
         });
@@ -3766,6 +3813,8 @@ const VideoSourceConfig = ({
             api: item.api,
             detail: item.detail || '',
             is_adult: item.is_adult || false,
+            type: item.type || 'vod',
+            weight: item.weight ?? 50,
           });
 
           result.success++;
@@ -4150,7 +4199,8 @@ const VideoSourceConfig = ({
               onChange={(e) => {
                 const name = e.target.value;
                 const isAdult = /^(AV-|成人|伦理|福利|里番|R18)/i.test(name);
-                setNewSource((prev) => ({ ...prev, name, is_adult: isAdult }));
+                const autoKey = generateKeyFromName(name);
+                setNewSource((prev) => ({ ...prev, name, key: autoKey, is_adult: isAdult }));
               }}
               className='px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100'
             />
@@ -5194,13 +5244,7 @@ const SiteConfigComponent = ({ config, refreshConfig }: { config: AdminConfig | 
   });
 
   // Cron 配置状态
-  const [cronSettings, setCronSettings] = useState<CronConfig>({
-    enableAutoRefresh: true,
-    maxRecordsPerRun: 100,
-    onlyRefreshRecent: true,
-    recentDays: 30,
-    onlyRefreshOngoing: true,
-  });
+  const [cronSettings, setCronSettings] = useState<CronConfig>(DEFAULT_CRON_CONFIG);
 
   // 豆瓣数据源相关状态
   const [isDoubanDropdownOpen, setIsDoubanDropdownOpen] = useState(false);
@@ -5279,11 +5323,11 @@ const SiteConfigComponent = ({ config, refreshConfig }: { config: AdminConfig | 
   useEffect(() => {
     if (config?.CronConfig) {
       setCronSettings({
-        enableAutoRefresh: config.CronConfig.enableAutoRefresh ?? true,
-        maxRecordsPerRun: config.CronConfig.maxRecordsPerRun ?? 100,
-        onlyRefreshRecent: config.CronConfig.onlyRefreshRecent ?? true,
-        recentDays: config.CronConfig.recentDays ?? 30,
-        onlyRefreshOngoing: config.CronConfig.onlyRefreshOngoing ?? true,
+        enableAutoRefresh: config.CronConfig.enableAutoRefresh ?? DEFAULT_CRON_CONFIG.enableAutoRefresh,
+        maxRecordsPerRun: config.CronConfig.maxRecordsPerRun ?? DEFAULT_CRON_CONFIG.maxRecordsPerRun,
+        onlyRefreshRecent: config.CronConfig.onlyRefreshRecent ?? DEFAULT_CRON_CONFIG.onlyRefreshRecent,
+        recentDays: config.CronConfig.recentDays ?? DEFAULT_CRON_CONFIG.recentDays,
+        onlyRefreshOngoing: config.CronConfig.onlyRefreshOngoing ?? DEFAULT_CRON_CONFIG.onlyRefreshOngoing,
       });
     }
   }, [config]);
@@ -6952,9 +6996,11 @@ const LiveSourceConfig = ({
               type='text'
               placeholder='名称'
               value={newLiveSource.name}
-              onChange={(e) =>
-                setNewLiveSource((prev) => ({ ...prev, name: e.target.value }))
-              }
+              onChange={(e) => {
+                const name = e.target.value;
+                const autoKey = generateKeyFromName(name);
+                setNewLiveSource((prev) => ({ ...prev, name, key: autoKey }));
+              }}
               className='px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100'
             />
             <input
@@ -7976,7 +8022,7 @@ function AdminPageClient() {
                 isExpanded={expandedTabs.trustedNetworkConfig}
                 onToggle={() => toggleTab('trustedNetworkConfig')}
               >
-                <TrustedNetworkConfig config={config} refreshConfig={fetchConfig} />
+                <TrustedNetworkConfig />
               </CollapsibleTab>
             )}
 
