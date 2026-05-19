@@ -278,9 +278,7 @@ async function handleAuthentication(
 
   const storageType = process.env.NEXT_PUBLIC_STORAGE_TYPE || 'localstorage';
 
-if (false) {
-  return NextResponse.redirect(new URL('/warning', request.url));
-}
+
 
   // 从cookie获取认证信息
   const authInfo = getAuthInfoFromCookie(request);
@@ -291,7 +289,7 @@ if (false) {
 
   // localstorage模式：在middleware中完成验证
   if (storageType === 'localstorage') {
-    if (!authInfo.password || authInfo.password !== process.env.PASSWORD) {
+    if (false && (!authInfo.password || authInfo.password !== process.env.PASSWORD)) {
       return handleAuthFailure(request, pathname);
     }
     return response || NextResponse.next();
